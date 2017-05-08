@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="stylesheet" href="css/todo.css">
+    <script src="js/lib/jquery-1.12.4.js"></script>
+    <script src="js/lib/underscore.js"></script>
+    <script src="js/lib/backbone.js"></script>
+    <script src="js/lib/dot.js"></script>
+    <script src="js/lib/Backbone.localStorage.js"></script>
+</head>
+<body>
+    <div id="todo_box">
+        <header>
+            <input type="text" id="todo_text" placeholder="please enter......">
+            <button id="btn">确认添加</button>
+        </header>
+        <section>
+            <ul id="todo_list"></ul>
+        </section>
+    </div>
+    <script type="text-template" id="li_template">
+        <div>{{=it.title}}<span class="del">x</span></div>
+        <input type="text" value="{{=it.title}}"/>
+    </script>
+    <script>
+        var Item = Backbone.Model.extend({//创建li模型，定义其初始属性
+           defaults:{
+                title:"todo..",
+                time:new Date()
+           }
+        });
+
+        var Itemlist = Backbone.Collection.extend({//创建一个li集合对象
+            model:Item,//指定model类
+            localStorage: new Backbone.LocalStorage("todos-backbone")//本地存储
+        });
+        var Items = new Itemlist;
+
+        var ItemView = Backbone.View.extend({//单个li的视图对象
+            tagName:"li",
+            template:doT.template($("#li_template").text()),//需要插入的内容
+            events:{
+                "dblclick div"  : "edit",
+                "blur input"  : "close",
+                "click .del":"clear"
+            },
+            initialize:function(){
+                this.listenTo(this.model,"change",this.render);//模型改变触发render
+                this.listenTo(this.model, "destroy", this.remove);//从集合中删除这个模型
+            },
+            render:function(){
+//                console.log(this.model.toJSON());
+                this.$el.html(this.template(this.model.toJSON()));
+                return this;
+            },
+            edit:function(){
+                this.$el.toggleClass("todo_item");
+            },
+            close:function(){//改变li的内容
+                var value = this.$("input").val();//得到当前输入框的内容
+                if(!value){//如果为空，执行clear方法
+                    this.clear();
+                }else{//否则改变模型的title属性值到本地存储
+                    this.model.save({title: value});
+                    this.$el.toggleClass("todo_item");
+                }
+            },
+            clear:function(){//删除本地存储的这个模型
+                this.model.destroy();
+            }
+        });
+
+        var AppView = Backbone.View.extend({//整个todo的视图
+            el:"#todo_box",
+            events:{
+                "click #btn":"createEnter"
+            },
+            initialize:function(){
+                this.input = $("#todo_text");
+
+                this.listenTo(Items, 'add', this.addOne);//监听Items上的模型添加执行addOne方法
+                this.listenTo(Items, 'all', this.render);//监听Items上的所有变化执行render方法
+
+                Items.fetch();//从本地获取模型
+            },
+            render:function(){
+                console.log(Items.length);
+                if(Items.length){//Items的长度,有模型则显示内容，否则隐藏
+                    this.$("section").show();
+                }else{
+                    this.$("section").hide();
+                }
+            },
+            addOne:function(item){//在视图里添加一个li
+                var view = new ItemView({model: item});//实例化ItemView并传递model属性
+                console.log(view.render().el);
+                this.$("#todo_list").append(view.render().el);//添加一个li
+            },
+            createEnter:function(){//在Items里创建一个模型的新实例
+                if(!this.input.val())return;//如果输入框为空返回
+                Items.create({title: this.input.val()});//否则添加一个title属性值为输入内容的模型进Items
+                this.input.val('');
+            }
+        });
+        var app = new AppView;
+    </script>
+</body>
+</html>
